@@ -1,0 +1,21 @@
+# 1. Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 2. Virtual environment folder 
+env/
+venv/
+.env
+.venv
+.conda/
+consumption_evaluator/
+
+# 3.  Windows system files 
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 4. VS Code settings folder
+.vscode/
