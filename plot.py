@@ -6,6 +6,7 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
+import matplotlib.pyplot as plt
 
 # =============================================================================
 # 1. Data Preprocessing Module
@@ -81,6 +82,20 @@ def get_user_choice(options, prompt_name):
                 print(f"[Error] Please enter a number between 1 and {len(options)}.")
         except ValueError:
             print("[Error] Invalid input. Please enter a number.")
+# loss plot generator
+def plot_loss_curve(loss_history):
+    plt.figure(figsize=(10, 6))
+    plt.plot(loss_history, label='Training Loss', color='blue', linewidth=2)
+    plt.title('Model Training Loss Curve (400 Epochs)', fontsize=16)
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Loss (MSE)', fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(fontsize=12)
+    
+    # show&save the plot
+    plt.savefig('training_loss_curve.png', dpi=300)
+    print(">>> [System] Loss graph saved as 'training_loss_curve.png'")
+    plt.show() 
 
 # =============================================================================
 # 4. Main Execution Block
@@ -114,9 +129,11 @@ def main():
     model = EnergyPredictor(input_dim)
     criterion = nn.MSELoss() 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    
-    print("\n>>> [System] Training Model (Epochs: 200)...")
-    epochs = 200 
+
+    # Training Loop
+    print("\n>>> [System] Training Model (Epochs: 50)...")
+    epochs = 400 
+    loss_history = [] 
     
     for epoch in range(epochs):
         model.train()
@@ -126,7 +143,16 @@ def main():
         loss.backward()
         optimizer.step()
         
+        # Loss value
+        loss_history.append(loss.item())
+
+        if (epoch+1) % 10 == 0:
+            print(f"Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}")
+            
     print(">>> [System] Training Complete.")
+    
+    # plot generator
+    plot_loss_curve(loss_history)
 
     # ---------------------------------------------------------
     # [Phase 3] Interactive Edge AI Demo (Menu Selection)
