@@ -64,3 +64,6 @@ pip install -r requirements.txt
 **Execute the `main.py` script.**
 ```python main.py```
 **Enter and select conditions**
+
+## 5.appendix.
+* `plot.py` and `training_loss_curve.png` are the code and figure to draw the loss plot to find the appropriate epoch.
