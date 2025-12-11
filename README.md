@@ -39,11 +39,19 @@ The model is designed using **PyTorch** to perform regression analysis.
 
 ---
 
-## 3. Installation and Usage
+## 3. Environment & Dependencies
 
-### Prerequisites
-* Python 3.8 or higher
-* Required libraries: `pandas`, `numpy`, `torch`, `scikit-learn`
+This project was developed and tested in the following environment.
+
+* **OS:** Windows 11
+* **Python Version:** Python 3.9.25
+* **Key Libraries:**
+    * `torch`: For building and training the MLP model.
+    * `pandas`: For data manipulation and CSV loading.
+    * `numpy`: For numerical operations and tensor conversion.
+    * `scikit-learn`: For data preprocessing.
+
+## 4. Installation and Usage
 
 ### Installation
 Clone this repository and install the dependencies.
@@ -52,3 +60,7 @@ Clone this repository and install the dependencies.
 git clone https://github.com/milh0919-stack/Termproject02.git
 pip install -r requirements.txt
 ```
+### Usage
+**Execute the `main.py` script.**
+```python main.py```
+**Enter and select conditions**
