@@ -7,170 +7,204 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
+# 1. Data Preprocessing Module
+# Description: Handles data loading, feature selection, and transformation.
 def load_and_preprocess_data(filepath):
-    # 1. Load Data
-    df = pd.read_csv(filepath)
+    """
+    Loads dataset and transforms features into machine-readable format.
+    """
+    # Step 1. Load Dataset
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
     
-    # 2. Feature Selection 
-    # We use 'Outdoor Temperature', 'Household Size' (Numerical)
-    # and 'Appliance Type', 'Season' (Categorical)
+    # Step 2. Feature Selection
+    # Selects only relevant features for context-aware analysis.
+    # Excludes 'Time' and 'Date' to focus on situational patterns rather than time-series.
     feature_cols = ['Outdoor Temperature (°C)', 'Household Size', 'Appliance Type', 'Season']
     X = df[feature_cols]
+    
+    # Target Variable: Energy Consumption (Regression Task)
     y = df['Energy Consumption (kWh)'].values.astype(np.float32)
     
-    # 3. Define Preprocessor
-    # Numerical features -> Standardization (StandardScaler)
-    # Categorical features -> One-Hot Encoding
+    # Step 3. Data Transformation Pipeline
+    # - Numerical Features (Temp, Size): Standardized (Mean=0, Std=1) for training stability.
+    # - Categorical Features (Appliance, Season): One-Hot Encoded to vector format.
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', StandardScaler(), ['Outdoor Temperature (°C)', 'Household Size']),
             ('cat', OneHotEncoder(sparse_output=False), ['Appliance Type', 'Season'])
         ])
     
-    # 4. Transform Data
+    # Fit and transform the data
     X_processed = preprocessor.fit_transform(X).astype(np.float32)
     
-    print(f"Data Loaded. Input Shape: {X_processed.shape}")
+    print(f"[System] Data Loaded Successfully. Input Dimension: {X_processed.shape}")
     return X_processed, y, preprocessor
 
+# 2. Deep Learning Model Architecture
+# Description: Multi-Layer Perceptron (MLP) for regression tasks.
+# Structure: Input(16) -> Hidden(64) -> ReLU -> Hidden(32) -> ReLU -> Output(1)
 class EnergyPredictor(nn.Module):
     def __init__(self, input_dim):
         super(EnergyPredictor, self).__init__()
         
-        # Layer 1: Expansion (Input -> 64 nodes)
-        # Captures complex features from input data
+        # [Layer 1] Expansion Layer
+        # Projects input features to a higher-dimensional space (16 -> 64) 
+        # to capture complex feature interactions.
         self.layer1 = nn.Linear(input_dim, 64) 
-        self.relu = nn.ReLU() # Activation function for non-linearity
         
-        # Layer 2: Compression (64 -> 32 nodes)
-        # Summarizes the learned features
+        # [Activation Function] ReLU (Rectified Linear Unit)
+        # Introduces non-linearity to learn complex patterns (e.g., sudden spikes).
+        self.relu = nn.ReLU() 
+        
+        # [Layer 2] Compression Layer
+        # Compresses learned features (64 -> 32) to extract core information.
         self.layer2 = nn.Linear(64, 32)
         
-        # Output Layer: Regression (32 -> 1 node)
-        # Predicts the final energy consumption value (kWh)
+        # [Output Layer] Linear Regression
+        # Predicts a single continuous value (kWh). No activation is used here.
         self.output_layer = nn.Linear(32, 1)
         
     def forward(self, x):
-        # Forward pass: Input -> Hidden 1 -> Hidden 2 -> Output
-        x = self.relu(self.layer1(x))
-        x = self.relu(self.layer2(x))
-        x = self.output_layer(x) # No activation at output (Linear regression)
+        """
+        Forward Propagation: Passes input data through the network layers.
+        """
+        x = self.relu(self.layer1(x))   # Input -> Hidden 1 -> Activation
+        x = self.relu(self.layer2(x))   # Hidden 1 -> Hidden 2 -> Activation
+        x = self.output_layer(x)        # Hidden 2 -> Output
         return x
 
-# ==========================================
-# 3. Main Execution Flow
-# ==========================================
+# 3. Main Execution Block
+# Description: Orchestrates the training process and runs the interactive demo.
 def main():
     # ---------------------------------------------------------
-    # [Step 3-1] Load Data (데이터 불러오기)
+    # [Phase 1] Data Loading & Preparation
     # ---------------------------------------------------------
-    print(">>> [Stage 1] Loading Data...")
+    print(">>> [System] Initializing AI Energy Auditor...")
     
-    # file_path = r'C:\Termproject02\smart_home_energy_consumption_large.csv' 
-    file_path = 'smart_home_energy_consumption_large.csv' 
+    # Define file path (Relative path for portability)
+    file_path = 'smart_home_energy_consumption_large.csv'
     
     try:
         X, y, preprocessor = load_and_preprocess_data(file_path)
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}. Please check the path.")
+    except Exception as e:
+        print(f"[Error] {e}")
         return
 
-    # ---------------------------------------------------------
-    # [Step 3-2] Train / Test Split (학습/평가 데이터 분리)
-    # ---------------------------------------------------------
-    # 80% for Training, 20% for Testing
+    # Split dataset into Training (80%) and Testing (20%) sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    # Convert numpy arrays to PyTorch Tensors
+    # Convert Numpy arrays to PyTorch Tensors for model input
     X_train_tensor = torch.tensor(X_train)
-    y_train_tensor = torch.tensor(y_train).view(-1, 1)
-    X_test_tensor = torch.tensor(X_test)
-    y_test_tensor = torch.tensor(y_test).view(-1, 1)
+    y_train_tensor = torch.tensor(y_train).view(-1, 1) # Reshape to (N, 1)
     
-    input_dim = X_train.shape[1] # 16 features
-    print(f"Data Loaded Successfully. Input Dimension: {input_dim}") 
+    # Determine input dimension dynamically (Expected: 16)
+    input_dim = X_train.shape[1]
 
     # ---------------------------------------------------------
-    # [Step 3-3] Initialize Model, Loss, Optimizer (모델 초기화)
+    # [Phase 2] Model Initialization
     # ---------------------------------------------------------
     model = EnergyPredictor(input_dim)
     
-    # Loss Function: Mean Squared Error (MSE) - 예측값과 실제값 차이의 제곱
+    # Loss Function: Mean Squared Error (MSE) for regression accuracy
     criterion = nn.MSELoss() 
     
-    # Optimizer: Adam (Adaptive Moment Estimation) - 가장 대중적인 최적화 도구
+    # Optimizer: Adam (Adaptive Moment Estimation) for efficient convergence
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     # ---------------------------------------------------------
-    # [Step 3-4] Training Loop (학습 진행)
+    # [Phase 3] Training Loop (Learning Process)
     # ---------------------------------------------------------
-    print("\n>>> [Stage 2] Training Model...")
-    epochs = 50 # 반복 횟수 
+    print("\n>>> [System] Training Model (Epochs: 50)...")
+    epochs = 50 
     
     for epoch in range(epochs):
-        model.train() # 학습 모드 전환
+        model.train() # Set model to training mode
         
-        # 1. Forward pass 
+        # 1. Zero Gradients: Clear previous gradients
+        optimizer.zero_grad()
+        
+        # 2. Forward Pass: Compute predictions
         outputs = model(X_train_tensor)
+        
+        # 3. Compute Loss: Calculate error between prediction and ground truth
         loss = criterion(outputs, y_train_tensor)
         
-        # 2. Backward pass and optimization 
-        optimizer.zero_grad()
+        # 4. Backward Pass: Backpropagation of errors
         loss.backward()
+        
+        # 5. Update Weights: Optimize model parameters
         optimizer.step()
         
-        # 10번마다 로그 출력
-        if (epoch+1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}")
+    print(">>> [System] Training Complete.")
 
     # ---------------------------------------------------------
-    # [Step 3-5] Evaluation (성능 평가)
+    # [Phase 4] Interactive Edge AI Demo
+    # Scenario: Appliance self-diagnoses its energy efficiency.
     # ---------------------------------------------------------
-    model.eval() # 평가 모드 전환 (학습 중단)
-    with torch.no_grad():
-        test_loss = criterion(model(X_test_tensor), y_test_tensor)
-    print(f"\nFinal Test Loss (MSE): {test_loss.item():.4f}")
+    print("\n" + "="*60)
+    print("   🔌  Smart Appliance Self-Diagnosis Mode (Edge AI)  🔌")
+    print("="*60)
+    print("Please input the current context to evaluate energy efficiency.\n")
 
-    # =========================================================
-    # 4. Demo Application: "My Energy Auditor"
-    # =========================================================
-    print("\n" + "="*50)
-    print(">>> [Stage 3] Demo: AI Energy Auditor")
-    print("="*50)
-    
-    # 1. Define My Situation 
-    my_situation = pd.DataFrame({
-        'Outdoor Temperature (°C)': [-5.0],  # 아주 추운 날
-        'Household Size': [4],               # 4인 가족
-        'Appliance Type': ['Heater'],        # 히터 사용
-        'Season': ['Winter']                 # 겨울
-    })
-    
-    # 2. Transform Input (전처리기를 이용해 숫자로 변환)
-    my_input_vector = preprocessor.transform(my_situation).astype(np.float32)
-    my_input_tensor = torch.tensor(my_input_vector)
-    
-    # 3. AI Prediction 
-    model.eval()
-    with torch.no_grad():
-        ai_prediction = model(my_input_tensor).item()
-    
-    # 4. Compare with Actual Usage (내 실제 사용량 비교)
-    my_actual_usage = 4.5  # 가정: 내가 실제로 쓴 전력량 (스마트 플러그 측정값)
-    
-    print(f"[Situation]: Winter(-5°C), 4 People, Using 'Heater'")
-    print(f"--------------------------------------------------")
-    print(f"My Actual Usage        : {my_actual_usage:.2f} kWh")
-    print(f"AI Standard Prediction : {ai_prediction:.2f} kWh")
-    print(f"--------------------------------------------------")
-    
-    diff = my_actual_usage - ai_prediction
-    if diff > 0:
-        print(f"Result: WARNING! You are using {diff:.2f} kWh MORE than average.")
-        print(f"Efficiency Grade: C (Poor)")
-    else:
-        print(f"Result: GREAT! You are saving {-diff:.2f} kWh compared to average.")
-        print(f"Efficiency Grade: A (Excellent)")
+    try:
+        # Simulate Sensor Inputs from User
+        temp = float(input("1. Outdoor Temperature (C) [e.g., -5.0]: "))
+        size = int(input("2. Household Size (People) [e.g., 4]: "))
+        
+        print("\n[Supported Appliances]: Fridge, Oven, Dishwasher, Heater, Microwave, Air Conditioning, TV")
+        appliance = input("3. Appliance Type [Case Sensitive!]: ")
+        
+        print("\n[Seasons]: Spring, Summer, Fall, Winter")
+        season = input("4. Current Season: ")
+        
+        # Actual usage measured by smart plug
+        actual_usage = float(input("\n>>> Actual Energy Usage (kWh): "))
+
+        # Construct Input DataFrame
+        my_situation = pd.DataFrame({
+            'Outdoor Temperature (°C)': [temp],
+            'Household Size': [size],
+            'Appliance Type': [appliance],
+            'Season': [season]
+        })
+
+        # Preprocess Input (Transform to Tensor)
+        my_input_vector = preprocessor.transform(my_situation).astype(np.float32)
+        my_input_tensor = torch.tensor(my_input_vector)
+        
+        # Perform Inference (Prediction)
+        model.eval() # Set to evaluation mode
+        with torch.no_grad(): # Disable gradient calculation
+            ai_prediction = model(my_input_tensor).item()
+
+        # Display Diagnosis Results
+        print("\n" + "-"*50)
+        print(f" >>> [AI Diagnosis Report]")
+        print("-"*50)
+        print(f" - Actual Usage      : {actual_usage:.2f} kWh")
+        print(f" - Standard Usage    : {ai_prediction:.2f} kWh (AI Predicted)")
+        
+        # Anomaly Detection Logic
+        diff = actual_usage - ai_prediction
+        threshold = 0.5 # Anomaly threshold (kWh)
+        
+        print("-" * 50)
+        if diff > threshold:
+            print(" Result: [WARNING] Over-consumption Detected!")
+            print(f" You are using {diff:.2f} kWh MORE than the standard context.")
+        elif diff < -threshold:
+            print(" Result: [EXCELLENT] High Energy Efficiency!")
+            print(f" You are saving {-diff:.2f} kWh compared to the standard.")
+        else:
+            print(" Result: [NORMAL] Usage is within the expected range.")
+        print("-" * 50)
+
+    except Exception as e:
+        print(f"\n[Error] Invalid Input: {e}")
+        print("Please check your inputs (e.g., spelling of Appliance Type) and try again.")
 
 if __name__ == '__main__':
     main()
